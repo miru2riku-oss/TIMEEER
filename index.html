@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clock & Timer App</title>
+    <style>
+        /* 全体の設定 */
+        :root {
+            --primary-orange: #FF5722;
+            --primary-navy: #1A237E;
+            --custom-font: 'sans-serif';
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: var(--custom-font);
+            background-color: #111;
+            color: #fff;
+        }
+
+        /* 背景スライダー */
+        #bg-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 2s ease-in-out;
+        }
+
+        /* アプリ画面のコンテナ */
+        #app-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* 画像を下に配置 */
+        }
+
+        /* 起動時の選択画面・設定画面のモーダル */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(26, 35, 126, 0.85); /* 紺色の半透明 */
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .hidden { display: none !important; }
+
+        /* ボタンデザイン */
+        .btn {
+            background: var(--primary-orange);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn:hover { background: #E64A19; }
+
+        /* グラフィック表示領域 */
+        #graphic-container {
+            position: relative;
+            width: 100%;
+            height: 200px; /* 画像の高さに合わせて調整 */
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* 背景画像（アップロードされたもの） */
+        #graphic-img {
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 文字の配置設定（画像の比率に合わせて調整が必要な場合があります） */
+        .graphic-content {
+            position: absolute;
+            width: 100%;
+            max-width: 1920px; /* 画像の元の幅などに合わせる */
+            height: 100%;
+            top: 0;
+        }
+
+        /* 左側の大きな数字（オレンジの部分） */
+        #main-time {
+            position: absolute;
+            left: 20%; /* 調整ポイント: オレンジの枠の位置 */
+            bottom: 20%; /* 調整ポイント */
+            font-size: 80px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* 右上の文字（オレンジの線の中心） */
+        #sub-label {
+            position: absolute;
+            left: 42%; /* 調整ポイント: オレンジの線の位置 */
+            top: 35%;  /* 調整ポイント */
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-orange);
+            letter-spacing: 2px;
+        }
+
+        /* オレンジのカーテントランジション */
+        #curtain {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 250px; /* グラフィックを覆う高さ */
+            background-color: var(--primary-orange);
+            transform: scaleX(0);
+            transform-origin: left;
+            z-index: 50;
+        }
+        .curtain-animate {
+            animation: curtainSweep 1.5s ease-in-out;
+        }
+        @keyframes curtainSweep {
+            0% { transform: scaleX(0); transform-origin: left; }
+            40% { transform: scaleX(1); transform-origin: left; }
+            50% { transform: scaleX(1); transform-origin: right; }
+            100% { transform: scaleX(0); transform-origin: right; }
+        }
+
+        /* 音楽プレイヤーUI (左上など) */
+        #music-player {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(26, 35, 126, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary-orange);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #album-art { width: 50px; height: 50px; background: #000; object-fit: cover; }
+        
+        /* 歯車アイコン（設定用） */
+        #settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 30px;
+            cursor: pointer;
+            z-index: 20;
+            background: none;
+            border: none;
+            color: white;
+        }
+
+        /* 設定パネル */
+        .settings-panel {
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .settings-group { margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .settings-group h3 { color: var(--primary-navy); margin-top: 0; }
+        input[type="number"], input[type="time"] { padding: 5px; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <div id="bg-slider"></div>
+
+    <button id="settings-btn">⚙️</button>
+
+    <div id="music-player" class="hidden">
+        <img id="album-art" src="" alt="Cover">
+        <div>
+            <div id="song-title">No song playing</div>
+            <button onclick="prevSong()">⏮</button>
+            <button onclick="togglePlay()" id="play-pause-btn">⏯</button>
+            <button onclick="nextSong()">⏭</button>
+        </div>
+    </div>
+
+    <div id="startup-modal" class="modal">
+        <h1 style="color:var(--primary-orange);">App Select</h1>
+        <button class="btn" onclick="startApp('clock')">CLOCK を起動</button>
+        <button class="btn" onclick="startApp('timer')">TIMER を起動</button>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+        <div class="settings-panel">
+            <h2>設定</h2>
+            
+            <div class="settings-group">
+                <h3>モード切替</h3>
+                <button onclick="switchMode('clock')">時計にする</button>
+                <button onclick="switchMode('timer')">タイマーにする</button>
+            </div>
+
+            <div class="settings-group" id="timer-settings" style="display:none;">
+                <h3>タイマー設定</h3>
+                <label>何分後: <input type="number" id="timer-minutes" min="1"></label> <button onclick="setTimerByMinutes()">スタート</button><br><br>
+                <label>時刻指定: <input type="time" id="timer-time"></label> <button onclick="setTimerByTime()">スタート</button><br><br>
+                <button onclick="stopTimer()" style="background:red; color:white;">タイマー停止</button>
+            </div>
+
+            <div class="settings-group">
+                <h3>フォント設定</h3>
+                <input type="file" id="font-upload" accept=".ttf,.woff,.woff2,.otf">
+            </div>
+
+            <div class="settings-group">
+                <h3>背景画像設定（複数可）</h3>
+                <input type="file" id="bg-upload" accept="image/*" multiple>
+                <p>切り替え秒数: <input type="number" id="bg-interval" value="10" min="1">秒</p>
+            </div>
+
+            <div class="settings-group">
+                <h3>音楽設定（複数可）</h3>
+                <input type="file" id="music-upload" accept="audio/*" multiple><br><br>
+                <label>ジャケット画像: <input type="file" id="cover-upload" accept="image/*"></label>
+            </div>
+
+            <button class="btn" onclick="closeSettings()" style="width:100%; background:var(--primary-navy);">閉じる</button>
+        </div>
+    </div>
+
+    <div id="app-wrapper">
+        <div id="graphic-container">
+            <img src="bg-image.png" id="graphic-img" alt="">
+            
+            <div id="curtain"></div>
+
+            <div class="graphic-content">
+                <div id="main-time">00:00</div>
+                <div id="sub-label">NOW TIME</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 状態管理変数 ---
+        let currentMode = 'clock'; // 'clock' or 'timer'
+        let timerInterval;
+        let clockInterval;
+        
+        // --- タイマー関連 ---
+        let targetTime = localStorage.getItem('timerTarget') ? parseInt(localStorage.getItem('timerTarget')) : null;
+
+        // --- 音楽関連 ---
+        let audioFiles = [];
+        let currentAudio = new Audio();
+        let isPlaying = false;
+        let currentSongIndex = 0;
+
+        // --- 背景関連 ---
+        let bgImages = [];
+        let bgIndex = 0;
+        let bgIntervalId;
+
+        // --- DOM要素 ---
+        const mainTimeEl = document.getElementById('main-time');
+        const subLabelEl = document.getElementById('sub-label');
+        const curtainEl = document.getElementById('curtain');
+
+        // アプリ起動
+        function startApp(mode) {
+            document.getElementById('startup-modal').classList.add('hidden');
+            
+            // 保存されたタイマーがあれば復帰
+            if (targetTime && targetTime > Date.now()) {
+                switchMode('timer', true);
+            } else {
+                switchMode(mode, true);
+            }
+        }
+
+        // モード切替とカーテントランジション
+        function switchMode(mode, isStartup = false) {
+            if (!isStartup) {
+                // アニメーション開始
+                curtainEl.classList.remove('curtain-animate');
+                void curtainEl.offsetWidth; // リフロー強制
+                curtainEl.classList.add('curtain-animate');
+                
+                // カーテンが閉まりきったタイミング(約0.6秒後)で文字を切り替え
+                setTimeout(() => applyMode(mode), 600);
+            } else {
+                applyMode(mode);
+            }
+            closeSettings();
+        }
+
+        function applyMode(mode) {
+            currentMode = mode;
+            clearInterval(clockInterval);
+            clearInterval(timerInterval);
+
+            if (mode === 'clock') {
+                subLabelEl.innerText = 'NOW TIME';
+                updateClock();
+                clockInterval = setInterval(updateClock, 1000);
+                document.getElementById('timer-settings').style.display = 'none';
+            } else {
+                subLabelEl.innerText = 'TIMER';
+                document.getElementById('timer-settings').style.display = 'block';
+                if (targetTime && targetTime > Date.now()) {
+                    timerInterval = setInterval(updateTimer, 1000);
+                    updateTimer();
+                } else {
+                    mainTimeEl.innerText = "00:00";
+                }
+            }
+        }
+
+        // 時計処理
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            mainTimeEl.innerText = `${h}:${m}:${s}`;
+        }
+
+        // タイマー処理
+        function setTimerByMinutes() {
+            const mins = document.getElementById('timer-minutes').value;
+            if (!mins) return;
+            targetTime = Date.now() + (mins * 60 * 1000);
+            localStorage.setItem('timerTarget', targetTime);
+            applyMode('timer');
+        }
+
+        function setTimerByTime() {
+            const timeVal = document.getElementById('timer-time').value;
+            if (!timeVal) return;
+            const [h, m] = timeVal.split(':');
+            const now = new Date();
+            let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+            
+            // 過去の時間が指定されたら翌日にする
+            if (target.getTime() < now.getTime()) {
+                target.setDate(target.getDate() + 1);
+            }
+            targetTime = target.getTime();
+            localStorage.setItem('timerTarget', targetTime);
+            applyMode('timer');
+        }
+
+        function stopTimer() {
+            targetTime = null;
+            localStorage.removeItem('timerTarget');
+            clearInterval(timerInterval);
+            mainTimeEl.innerText = "00:00";
+        }
+
+        function updateTimer() {
+            if (!targetTime) return;
+            const diff = targetTime - Date.now();
+            if (diff <= 0) {
+                stopTimer();
+                mainTimeEl.innerText = "00:00";
+                alert("タイマー終了！");
+                return;
+            }
+            const h = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, '0');
+            const m = String(Math.floor((diff / 1000 / 60) % 60)).padStart(2, '0');
+            const s = String(Math.floor((diff / 1000) % 60)).padStart(2, '0');
+            
+            // 1時間以上ある場合は時も表示
+            if (h > 0) {
+                mainTimeEl.innerText = `${h}:${m}:${s}`;
+            } else {
+                mainTimeEl.innerText = `${m}:${s}`;
+            }
+        }
+
+        // --- 設定モーダル制御 ---
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.remove('hidden');
+        });
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        // --- フォントアップロード ---
+        document.getElementById('font-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const newStyle = document.createElement('style');
+                    newStyle.appendChild(document.createTextNode(`
+                        @font-face {
+                            font-family: 'CustomUserFont';
+                            src: url('${evt.target.result}');
+                        }
+                        :root { --custom-font: 'CustomUserFont', sans-serif; }
+                    `));
+                    document.head.appendChild(newStyle);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // --- 背景画像アップロード ---
+        document.getElementById('bg-upload').addEventListener('change', function(e) {
+            bgImages = [];
+            for (let i = 0; i < e.target.files.length; i++) {
+                bgImages.push(URL.createObjectURL(e.target.files[i]));
+            }
+            if (bgImages.length > 0) {
+                startBgSlideshow();
+            }
+        });
+
+        function startBgSlideshow() {
+            clearInterval(bgIntervalId);
+            const intervalSec = document.getElementById('bg-interval').value || 10;
+            const slider = document.getElementById('bg-slider');
+            
+            slider.style.backgroundImage = `url(${bgImages[0]})`;
+            if (bgImages.length > 1) {
+                bgIntervalId = setInterval(() => {
+                    bgIndex = (bgIndex + 1) % bgImages.length;
+                    slider.style.backgroundImage = `url(${bgImages[bgIndex]})`;
+                }, intervalSec * 1000);
+            }
+        }
+
+        // --- 音楽プレイヤー処理 ---
+        document.getElementById('music-upload').addEventListener('change', function(e) {
+            audioFiles = Array.from(e.target.files);
+            if (audioFiles.length > 0) {
+                document.getElementById('music-player').classList.remove('hidden');
+                shuffleAudio();
+                playSong(0);
+            }
+        });
+
+        document.getElementById('cover-upload').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                document.getElementById('album-art').src = URL.createObjectURL(e.target.files[0]);
+            }
+        });
+
+        function shuffleAudio() {
+            for (let i = audioFiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [audioFiles[i], audioFiles[j]] = [audioFiles[j], audioFiles[i]];
+            }
+        }
+
+        function playSong(index) {
+            if (audioFiles.length === 0) return;
+            currentSongIndex = index;
+            const file = audioFiles[currentSongIndex];
+            document.getElementById('song-title').innerText = file.name;
+            currentAudio.src = URL.createObjectURL(file);
+            currentAudio.play();
+            isPlaying = true;
+            document.getElementById('play-pause-btn').innerText = '⏸';
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                currentAudio.pause();
+                document.getElementById('play-pause-btn').innerText = '▶';
+            } else {
+                currentAudio.play();
+                document.getElementById('play-pause-btn').innerText = '⏸';
+            }
+            isPlaying = !isPlaying;
+        }
+
+        function nextSong() {
+            let nextIndex = (currentSongIndex + 1) % audioFiles.length;
+            playSong(nextIndex);
+        }
+
+        function prevSong() {
+            let prevIndex = (currentSongIndex - 1 + audioFiles.length) % audioFiles.length;
+            playSong(prevIndex);
+        }
+
+        // 曲が終わったら自動で次の曲へ
+        currentAudio.addEventListener('ended', nextSong);
+
+    </script>
+</body>
+</html>
